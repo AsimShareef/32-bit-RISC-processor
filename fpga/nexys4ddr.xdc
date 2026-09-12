@@ -1,25 +1,27 @@
-## 100 MHz clock input
+## Nexys4 DDR / Nexys A7 constraints for fpga/top_autonomous.v (and its
+## top_booth.v / top_hamming.v instances). Pin numbers match Table 1 of the
+## "Final Integration - Autonomous Program Execution" addendum.
+##
+## NOTE on the original version of this project: its regbank32.xdc
+## constrained ports named `clk`, `reset`, `sw0`, `led[15:0]`, but the
+## top-level module that shipped in the repo (risc_processor.v) had ports
+## `clk, rst, interrupt, pc_out, halt_out` -- no `reset`, no `sw0`, no
+## `led` at all, and no board-level top module existed to bridge the two.
+## The constraints could not have been applied to anything that was
+## actually checked in. fpga/top_autonomous.v now has exactly the ports
+## this file expects.
+
+## 100 MHz system clock
 set_property -dict { PACKAGE_PIN E3    IOSTANDARD LVCMOS33 } [get_ports clk]
-create_clock -add -name sys_clk_pin -period 20.00 -waveform {0 5} [get_ports clk]
+create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports clk]
 
-## Push-button for execution (BTNC)
-set_property -dict { PACKAGE_PIN C12   IOSTANDARD LVCMOS33 } [get_ports reset]
+## BTNC: reset / run button (active-high)
+set_property -dict { PACKAGE_PIN N17   IOSTANDARD LVCMOS33 } [get_ports reset]
 
-## Switches (SW[15:0])
-set_property -dict { PACKAGE_PIN J15   IOSTANDARD LVCMOS33 } [get_ports {sw0}]
-#set_property -dict { PACKAGE_PIN T18   IOSTANDARD LVCMOS33 } [get_ports {SW[5]}]
-#set_property -dict { PACKAGE_PIN U18   IOSTANDARD LVCMOS33 } [get_ports {SW[6]}]
-#set_property -dict { PACKAGE_PIN R13   IOSTANDARD LVCMOS33 } [get_ports {SW[7]}]
-#set_property -dict { PACKAGE_PIN T8    IOSTANDARD LVCMOS33 } [get_ports {SW[8]}]
-#set_property -dict { PACKAGE_PIN U8    IOSTANDARD LVCMOS33 } [get_ports {SW[9]}]
-#set_property -dict { PACKAGE_PIN R16   IOSTANDARD LVCMOS33 } [get_ports {SW[10]}]
-#set_property -dict { PACKAGE_PIN T13   IOSTANDARD LVCMOS33 } [get_ports {SW[11]}]
-#set_property -dict { PACKAGE_PIN H6    IOSTANDARD LVCMOS33 } [get_ports {SW[12]}]
-#set_property -dict { PACKAGE_PIN U12   IOSTANDARD LVCMOS33 } [get_ports {SW[13]}]
-#set_property -dict { PACKAGE_PIN U11   IOSTANDARD LVCMOS33 } [get_ports {SW[14]}]
-#set_property -dict { PACKAGE_PIN V10   IOSTANDARD LVCMOS33 } [get_ports {SW[15]}]
+## SW0: display-select switch (0 = lower 16 bits, 1 = upper 16 bits)
+set_property -dict { PACKAGE_PIN J15   IOSTANDARD LVCMOS33 } [get_ports sw0]
 
-## LEDs (LED[15:0])
+## LED[15:0]: result display
 set_property -dict { PACKAGE_PIN H17   IOSTANDARD LVCMOS33 } [get_ports {led[0]}]
 set_property -dict { PACKAGE_PIN K15   IOSTANDARD LVCMOS33 } [get_ports {led[1]}]
 set_property -dict { PACKAGE_PIN J13   IOSTANDARD LVCMOS33 } [get_ports {led[2]}]
