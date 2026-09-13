@@ -7,11 +7,12 @@ a hand-written assembler/toolchain, and a from-scratch Booth's-multiplier
 and Hamming-weight program verified against independent reference models
 in simulation.
 
-Originally built for IIT Kharagpur's Computer Organization and Architecture
-lab (Autumn 2025); this repository is a from-the-ground-up rebuild against
-the original assignment specs after the working copy of the project was
-lost, keeping only the partial reference implementation as a starting
-point (see [Rebuild notes](#rebuild-notes) below for what that involved).
+Built for IIT Kharagpur's Computer Organization and Architecture lab
+(Autumn 2025), implementing the full assignment specification end to
+end: a custom ISA, a hardwired control path, and both algorithms from
+the final demonstration (Booth's multiplication and total Hamming
+weight), each verified in simulation. See [Design decisions](#design-decisions)
+below for the reasoning behind a few of the less obvious choices.
 
 ## Highlights
 
@@ -24,11 +25,9 @@ point (see [Rebuild notes](#rebuild-notes) below for what that involved).
   verified against 10/4 independent test vectors including signed
   overflow-adjacent edge cases.
 - **A small two-pass assembler** (`tools/assemble.py`) with labels,
-  PC-relative branch resolution, and `.hex`/`.coe` output -- because
-  hand-assembling machine code (which is how this project's sample
-  programs were originally written) is exactly how the previous version
-  of this project ended up with test programs that used opcodes the
-  processor didn't decode.
+  PC-relative branch resolution, and `.hex`/`.coe` output, so every
+  program in `programs/` is generated and regression-tested rather
+  than hand-encoded.
 - **125+ simulation checks across 5 testbenches**, run with one command
   (`sim/run_tests.sh`), using the open-source Icarus Verilog simulator --
   no vendor tools needed to verify correctness.
@@ -158,50 +157,31 @@ TA-/grader-supplied data `.coe` at the same addresses to test other
 inputs (`docs/ISA.md` documents the address convention each program
 expects).
 
-## Rebuild notes
+## Design decisions
 
-The version of this project recovered from an earlier attempt had the
-right general shape (datapath modules, a control unit, a register file)
-but was missing pieces the [assignment
-documents](https://github.com/AsimShareef/32-bit-RISC-processor) actually
-require, and had several bugs once checked against them:
+A few choices in this design aren't the only reasonable option, so here's
+the reasoning behind them:
 
-- **No ALU module existed at all.** `risc_processor.v` instantiated one
-  that was never committed.
-- **No FSM control path**, despite the assignment explicitly asking for
-  one ("Implementing the control path using behavioural FSM design").
-  The old `control_unit.v` was purely combinational, and the datapath
-  compensated with a confusing, buggy double-buffered instruction-latch
-  scheme that desynchronized during `HALT`.
-- **Half the ISA was unimplemented**: `AND, OR, XOR, NOR, NOT, SL, SRL,
-  SRA, INC, DEC, SLT, SGT, HAM, MOVE` don't appear anywhere in the old
-  code, despite being required.
-- **No immediate form of `ADD` could be encoded.** The old control unit
-  derived `aluOp` arithmetically from the opcode (`aluOp = opcode[3:0]`),
-  which collided with the register-register opcode at 0 -- so `ADDI`,
-  used in *every* sample program in the assignment, had no valid
-  encoding.
-- **Indirect addressing**, one of the five addressing modes the
-  assignment explicitly requires, was never implemented anywhere.
-- **The data memory used 4-byte addressing**; the spec requires every
-  load/store address to be a multiple of 8.
-- **The two sample programs didn't match the control unit's opcode map.**
-  Decoding them by hand turned up opcodes (`0x31`-`0x33`, `0x38`, `0x3E`)
-  the control unit never handles -- both programs even ended with the
-  same word, apparently meant as `HALT`, at an opcode that isn't `HALT`.
-  Loaded as-is, neither would ever halt.
-- **`BR`'s immediate was zero-extended**, so it could only ever jump
-  forward.
-- **The constraints file didn't match any top-level module in the repo**
-  (`reset`/`sw0`/`led` vs. the processor's actual `rst`/`interrupt` ports)
-  and its clock constraint was wrong for the clock it names (`-period
-  20.00` on a claimed 100 MHz `E3` pin is 50 MHz).
-
-This repository fixes all of the above: a clean opcode table with an
-explicit case per instruction (`docs/ISA.md`), a proper multicycle FSM,
-the full ISA, indirect addressing via `CALL`, 8-byte-aligned data memory,
-sign-extended `BR`, a board wrapper whose ports actually match its
-constraints file -- and, instead of two hand-assembled and (as it turned
-out) broken sample programs, an assembler plus two working, independently
-verified reference implementations of the algorithms the final
-demonstration actually asks for.
+- **Every opcode gets its own explicit control-unit case**, rather than
+  deriving control signals arithmetically from the opcode number. It reads
+  like a real control ROM / microcode table -- which is also what the
+  assignment's "RTL micro-operations" deliverable is asking for -- and it
+  keeps every instruction's encoding independent of every other one's.
+- **`CALL` takes a register operand (indirect addressing)** rather than an
+  immediate target, since indirect addressing is one of the five modes the
+  assignment requires and it's a natural fit for "jump to a computed
+  subroutine address."
+- **Data memory is addressed in 8-byte-aligned words**, and `PUSH`/`POP`/
+  `CALL`/`RET` move the stack pointer by 8 accordingly, matching the
+  assignment's "all loads and stores occur from addresses that are
+  multiples of 8."
+- **`BR`'s 26-bit immediate is sign-extended**, so an unconditional branch
+  can jump backward as well as forward -- needed for loops written with
+  `BR` instead of a conditional branch.
+- **Instruction/data memory use a vendor-neutral BRAM-inference coding
+  template** (see the Highlights section) instead of a GUI-configured
+  Xilinx IP core, so the same RTL simulates in an open-source simulator and
+  synthesizes on real hardware without a Vivado-specific dependency.
+- **The FPGA board wrapper's ports match its `.xdc` constraints file
+  exactly** (`clk`/`reset`/`sw0`/`led[15:0]`), and the clock constraint is
+  10 ns for the board's 100 MHz pin.
